@@ -5,27 +5,89 @@ import { MoonLoader } from "react-spinners";
 
 const Chat = ({ingredientList}) => {
   // logic
-  console.log("🚀 ~ Chat ~ ingredientList:", ingredientList);
   const endpoint = process.env.REACT_APP_SERVER_ADDRESS; 
-  console.log("🚀 ~ Chat ~ endpoint:", endpoint);
   
-
   const [value, setValue] = useState("");
 
   // TODO: set함수 추가하기
   const [messages, setMessages] = useState([]); // chatGPT와 사용자의 대화 메시지 배열
   const [infoMessages, setInfoMessages] = useState([]) // 초기셋팅 메시지 
-  const [isInfoLoading] = useState(false); // 최초 정보 요청시 로딩
-  const [isMessageLoading] = useState(true); // 사용자와 메시지 주고 받을때 로딩
+  const [isInfoLoading, setIsInfoLoading] = useState(true); // 최초 정보 요청시 로딩
+  const [isMessageLoading, setIsMessageLoading] = useState(false); // 사용자와 메시지 주고 받을때 로딩
+
   const hadleChange = (event) => {
     const { value } = event.target;
-    console.log("value==>", value);
     setValue(value);
   };
+
+  const sendMessage = async(userMessage, allMessages) => {
+    // "/message" API 호출 및 관련 state 업데이트 
+    setIsMessageLoading(true)
+    const data = {userMessage, messages: allMessages }
+    console.log("🚀 !!! ~ data:", data)
+    try {
+      const response = await fetch(`${endpoint}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({userMessage, messages: allMessages }),
+      });
+
+      const result = await response.json();
+      console.log("🚀 ~ sendMessage ~ result:", result)
+
+      // 응답받은 답변을 대화 목록에 추가 
+      setMessages((prev) => [...prev, {
+        role: "assistant",
+        content: result.data.content, 
+      }])
+
+    } catch (error) {
+      console.error(error);
+    } finally{
+      setIsMessageLoading(false);
+    }   
+  }
 
   const hadleSubmit = (event) => {
     event.preventDefault();
     console.log("메시지 보내기");
+    // 1. userMessage(현재 사용자가 입력한 메시지 정보)
+    const userMessage = {
+      role: "user",
+      content: value.trim(),
+    }
+    // 2. message(기존 대화 목록)
+    const allMessages = [...infoMessages, ...messages]
+
+    // // 재료 입력값 유효성 체크
+    // const handleNext = () => {
+
+    //   sendIngredientList(ingredientList);
+
+    //   // 입력값이 있는 배열
+    //   const filterDataList = ingredientList.filter(
+    //     (item) => item.value.trim() !== ""
+    //   );
+    //   console.log("🚀filterDataList:", filterDataList);
+    //   if (filterDataList.length) {
+    //     // 재료 입력값이 있는 경우
+    //     history("/chat");
+    //     return;
+    //   }
+
+    //   // 재료 입력값이 없는 경우
+    //   alert("재료를 최소 1개이상 입력해주세요");
+    // };
+
+
+    // State 관리 
+    // prev: 기존 대화 목록 (배열)
+    setMessages((prev) => [...prev, userMessage]);
+    
+    // 메시지 초기화
+    setValue("");
+    // api 호출 
+    sendMessage(userMessage, allMessages);
   };
 
   // 초기 세팅
@@ -62,8 +124,12 @@ const sendInfo = async (data) => {
     setMessages((prev) => [...prev, { role, content }]);
   } catch (error) {
     console.error(error);
+  } finally{
+    // API응답 완료 후 실행 
+    setIsInfoLoading(false);
   }
 };
+
 
 // state 감시용
 useEffect(() => {
@@ -71,7 +137,7 @@ useEffect(() => {
   sendInfo(ingredientList);
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
-
+ 
   // view
   return (
     <div className="w-full h-full px-6 pt-10 break-keep overflow-auto">
